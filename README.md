@@ -1,4 +1,5 @@
-# bot-app —— fnOS 上的 QQ 机器人一键部署（NapCat + GsCore + NoneBot2）
+# Bot-app
+- fnOS 上的 QQ 机器人一键部署（NapCat + GsCore + NoneBot2）
 
 在飞牛 fnOS（Debian 系 + systemd）上**全进程方式**（不用 Docker）跑起一套完整的 QQ 机器人环境：
 自动装好 NapCat / GsCore / NoneBot2，虚拟环境互相隔离、依赖走国内源，并附带一个零依赖的 Web 后台。
@@ -28,8 +29,16 @@ botctl status
 
 ## 装完这几步就通了
 
+**① 登录 QQ** —— 浏览器打开 NapCat 网页扫码即可，不需要命令，也没有参数：
+
+```
+http://<NAS-IP>:6099     # 换成你 NAS 的 IP；登录 token 在同一页的 Web 后台
+                         # 「NapCat → 显示 NapCat 令牌」里取，点一下会给带 token 的免密直达链接
+```
+
+**② 把链路打通**
+
 ```bash
-botctl qr                    # 显示二维码，登录 QQ
 botctl napcat-ws 你的QQ号     # 把 NapCat 的消息转发到 NoneBot2（自动对齐 token）
 botctl gscore-host           # 开放 GsCore 控制台到局域网
 botctl gscore-code           # 打印控制台注册码
@@ -37,7 +46,12 @@ botctl relink                # 控制台看不到 Bot 时，一键修复连接
 botctl doctor                # 一键自检：venv / 依赖 / 端口 / 令牌 / 连通性
 ```
 
-再把 `app/nonebot/.env` 里的 `SUPERUSERS` 改成自己的 QQ 号，业务插件（GenshinUID 等）装在 GsCore 侧。
+**③ 设管理员 QQ** —— 两种方式等效，任选其一：
+
+- 改 `app/nonebot/.env` 里的 `SUPERUSERS`，然后 `botctl restart nonebot`
+- 直接在 **GsCore 控制台**的设置里填「主人 QQ」（权限体系用）
+
+业务插件（GenshinUID 等）装在 GsCore 侧。
 
 不带参数敲 `botctl` 会打印完整命令清单，交互终端里还附编号菜单。
 
