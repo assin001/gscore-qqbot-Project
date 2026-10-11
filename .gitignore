@@ -1,0 +1,20 @@
+# 运行时生成 / 下载的内容，不入库
+
+# 面板密码与会话密钥（含明文密码，绝对不能提交）
+panel/panel.conf
+
+# NoneBot2 实际生效的配置（含随机 token）
+app/nonebot/.env
+
+# 安装脚本 clone / 生成的产物
+app/gscore/
+app/nonebot/plugins/
+env/
+logs/
+run/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
