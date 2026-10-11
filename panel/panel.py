@@ -128,6 +128,77 @@ def lan_ip() -> str:
 LAN_IP = lan_ip()
 
 # --------------------------------------------------------------------------
+#  NapCat WebUI 免密直达链接
+#
+#  NapCat 启动时会在 webui.json 里生成一个 token，URL 带上它就能免登录。
+#  这里复刻 botctl napcat-token 的探测逻辑：先按 NAPCAT_DIR / 常见路径找
+#  「可执行的 <目录>/opt/QQ/qq」，再读它旁边的 webui.json；读不到就退一步，
+#  去启动日志里抓 /webui?token=xxx（NapCat 启动时会把它打进日志）。
+#  结果缓存 30 秒，避免每次刷新总览都去扫盘。
+# --------------------------------------------------------------------------
+WEBUI_TOKEN_TTL = 30
+_WEBUI_TOKEN_RE = re.compile(r"https?://[^\s]*/webui\?token=([^\s&\"']+)")
+_webui_cache: dict = {"at": 0.0, "token": ""}
+
+
+def napcat_home() -> Path | None:
+    cands: list[Path] = []
+    conf_dir = (CONF.get("NAPCAT_DIR") or "").strip()
+    if conf_dir:
+        cands.append(Path(conf_dir))
+    cands.append(Path(os.path.expanduser("~")) / "Napcat")
+    cands += [Path("/root/Napcat"), Path("/opt/Napcat")]
+    if Path("/home").is_dir():
+        cands += sorted(Path("/home").glob("*/Napcat"))
+    for d in cands:
+        qq = d / "opt/QQ/qq"
+        # 从 Windows 传上来常丢可执行位，所以只要求文件存在
+        if qq.is_file():
+            return d
+    return None
+
+
+def _read_webui_token() -> str:
+    home = napcat_home()
+    if home is not None:
+        cfg = home / "opt/QQ/resources/app/app_launcher/napcat/config/webui.json"
+        try:
+            data = json.loads(cfg.read_text(encoding="utf-8", errors="replace")) or {}
+            tok = str(data.get("token") or "").strip()
+            if tok:
+                return tok
+        except (OSError, ValueError):
+            pass
+    # 兜底：启动日志里的 .../webui?token=xxxxx
+    for line in reversed(tail_file(LOG_DIR / "napcat.log", 200).split("\n")):
+        m = _WEBUI_TOKEN_RE.search(line)
+        if m:
+            return m.group(1)
+    return ""
+
+
+def napcat_webui_token() -> str:
+    now = time.time()
+    if now - float(_webui_cache["at"]) < WEBUI_TOKEN_TTL:
+        return str(_webui_cache["token"])
+    try:
+        tok = _read_webui_token()
+    except Exception:  # noqa: BLE001
+        tok = ""
+    _webui_cache.update(at=now, token=tok)
+    return tok
+
+
+def napcat_webui_url() -> str:
+    """带 token 的免密直达地址；读不到 token 就退回普通登录页地址。"""
+    base = f"http://{LAN_IP}:{NAPCAT_WEBUI_PORT}"
+    tok = napcat_webui_token()
+    if not tok:
+        return base
+    return f"{base}/webui?token={urllib.parse.quote(tok, safe='')}"
+
+
+# --------------------------------------------------------------------------
 #  会话与登录限流
 #
 #  会话令牌是【无状态签名串】： "<过期时间戳>.<HMAC-SHA256>",
@@ -679,7 +750,10 @@ class Handler(BaseHTTPRequestHandler):
             data["panel"] = {
                 "url": f"http://{LAN_IP}:{PANEL_PORT}",
                 "lan_ip": LAN_IP,
-                "napcat_webui": f"http://{LAN_IP}:{NAPCAT_WEBUI_PORT}",
+                # 带 token 的免密直达地址；没有 token 时退回普通地址
+                "napcat_webui": napcat_webui_url(),
+                "napcat_webui_base": f"http://{LAN_IP}:{NAPCAT_WEBUI_PORT}",
+                "napcat_autologin": bool(napcat_webui_token()),
                 "gscore_console": f"http://{LAN_IP}:{GSCORE_PORT}/app",
             }
             return self._json(data)

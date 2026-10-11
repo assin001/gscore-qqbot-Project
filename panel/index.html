@@ -353,8 +353,9 @@
               <button class="btn sm pri" data-run="napcat-token">显示 NapCat 令牌</button>
             </div>
             <div class="hint">
-              会打印 <code>WebUI Token</code> 和访问地址。打开
-              <code id="napcatUrlText">http://设备IP:6099</code>，粘贴 token 登录。
+              想省事就直接点「总览 → 访问入口 → NapCat」，那个磁贴是<b>免密直达</b>（链接里已经带上 token）。<br>
+              要手动登录：打开 <code id="napcatUrlText">http://设备IP:6099</code>，
+              再把上面按钮打印出来的 <code>WebUI Token</code> 粘进去。
             </div>
           </div>
 
@@ -808,18 +809,24 @@ async function loadOverview(){
   $('#svcFull').innerHTML  = list.map(svcHTML).join('') || '<div class="hint">没有服务信息</div>';
 
   const p = d.panel || {};
-  const tile = (name, url, note, label) => url
-    ? '<a class="tile" href="' + url + '" target="_blank" rel="noopener" title="' + url + '">' +
+  // secret=true 时不把原始 URL 铺进 title（NapCat 免密链接里带着登录 token，避免被随手复制外传）
+  const tile = (name, url, note, label, secret) => url
+    ? '<a class="tile" href="' + url + '" target="_blank" rel="noopener" title="' +
+        (secret ? '链接含登录 token，请勿外传' : url) + '">' +
         '<div class="t-name">' + name + '</div>' +
         '<div class="t-link">' + (label || '打开页面') + '</div>' +
         '<div class="t-note">' + note + '</div></a>'
     : '';
   $('#links').innerHTML =
     tile('本后台', p.url, '你正在看的这个页面', '回到主页') +
-    tile('NapCat', p.napcat_webui, '登录 token 在 NapCat 模块里', '访问后台') +
+    tile('NapCat', p.napcat_webui,
+         p.napcat_autologin ? '免密直达，链接含登录 token，别外传' : '需要登录 token，在 NapCat 模块里取',
+         p.napcat_autologin ? '免密进入' : '访问后台',
+         p.napcat_autologin) +
     tile('GsCore 控制台', p.gscore_console, '用注册码登录，在本模块里取', '访问后台');
 
-  if (p.napcat_webui) $('#napcatUrlText').textContent = p.napcat_webui;
+  // 这里只展示基础地址，不把带 token 的免密链接铺成文字
+  if (p.napcat_webui_base) $('#napcatUrlText').textContent = p.napcat_webui_base;
   if (p.gscore_console) $('#gscoreUrlText').textContent = p.gscore_console;
 
   const allOn = list.length && list.every(s => s.state === 'active');
