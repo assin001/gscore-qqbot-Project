@@ -1,5 +1,6 @@
-# Bot-app
-- fnOS 上的 QQ 机器人一键部署（NapCat + GsCore + NoneBot2）
+<h1 align="center">Bot-app</h1>
+
+<p align="center">fnOS 上的 QQ 机器人一键部署（NapCat + GsCore + NoneBot2）</p>
 
 在飞牛 fnOS（Debian 系 + systemd）上**全进程方式**（不用 Docker）跑起一套完整的 QQ 机器人环境：
 自动装好 NapCat / GsCore / NoneBot2，虚拟环境互相隔离、依赖走国内源，并附带一个零依赖的 Web 后台。
