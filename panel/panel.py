@@ -41,7 +41,7 @@ PANEL_CONF = HERE / "panel.conf"
 INDEX_HTML = HERE / "index.html"
 LOG_DIR = BASE_DIR / "logs"
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 _CONF_RE = re.compile(
     r"""^\s*([A-Za-z_][A-Za-z0-9_]*)=(?:"([^"]*)"|'([^']*)'|([^\s#]*))"""
@@ -220,6 +220,7 @@ _LAN_NETS = tuple(ipaddress.ip_network(n) for n in (
     "172.16.0.0/12",     # 私有网段
     "192.168.0.0/16",    # 私有网段，例如 192.168.1.1 / 192.168.1.20
     "169.254.0.0/16",    # 链路本地
+    "100.64.0.0/10",     # CGNAT / Tailscale 等私有组网（手机在外也当内网）
     "::1/128",           # IPv6 回环
     "fc00::/7",          # IPv6 唯一本地地址
     "fe80::/10",         # IPv6 链路本地
@@ -292,6 +293,16 @@ def session_ok(tok: str | None) -> bool:
         return False
     with _sess_lock:
         return tok not in _revoked
+
+
+def session_expire(tok: str | None) -> int:
+    """取令牌自带的过期时间戳；格式不对返回 0（仅供界面展示，不做校验）。"""
+    if not tok:
+        return 0
+    exp_s, _, sig = tok.partition(".")
+    if not exp_s.isdigit() or not sig:
+        return 0
+    return int(exp_s)
 
 
 def drop_session(tok: str | None) -> None:
@@ -755,6 +766,12 @@ class Handler(BaseHTTPRequestHandler):
                 "napcat_webui_base": f"http://{LAN_IP}:{NAPCAT_WEBUI_PORT}",
                 "napcat_autologin": bool(napcat_webui_token()),
                 "gscore_console": f"http://{LAN_IP}:{GSCORE_PORT}/app",
+                # 当前这次登录的判定结果，界面直接展示，省得靠猜
+                "session": {
+                    "ip": self._client_ip(),
+                    "lan": is_lan_ip(self._client_ip()),
+                    "expire": session_expire(self._auth()),
+                },
             }
             return self._json(data)
 
@@ -805,12 +822,16 @@ class Handler(BaseHTTPRequestHandler):
                 lan = is_lan_ip(src)
                 ttl = session_ttl_for(src)
                 tok = new_session(ttl)
+                # 落在 logs/panel.log 里，方便回头确认「这次到底给了多久、算不算内网」
+                self.log_message("login ok  socket=%s  判定来源=%s  内网=%s  有效期=%s天",
+                                 ip, src, "是" if lan else "否", ttl // 86400)
                 return self._json(
                     {"ok": True, "lan": lan, "ttl": ttl},
                     extra={"Set-Cookie":
                            f"botapp_sid={tok}; Path=/; HttpOnly; SameSite=Lax; Max-Age={ttl}"},
                 )
             login_fail(ip)
+            self.log_message("login 失败  socket=%s", ip)
             return self._json({"error": "密码错误"}, 401)
 
         if path == "/api/logout":

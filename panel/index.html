@@ -731,6 +731,12 @@ function toast(msg){
   const t = $('#toast'); t.textContent = msg; t.classList.add('show');
   clearTimeout(t._tm); t._tm = setTimeout(() => t.classList.remove('show'), 2400);
 }
+/* 秒数 -> 「30 天 / 12 小时 / 45 分钟」 */
+function dur(sec){
+  if (sec >= 86400) return (sec / 86400).toFixed(1).replace(/\.0$/, '') + ' 天';
+  if (sec >= 3600)  return Math.round(sec / 3600) + ' 小时';
+  return Math.max(1, Math.round(sec / 60)) + ' 分钟';
+}
 async function api(path, opts){
   const r = await fetch(path, Object.assign({ headers:{ 'Content-Type':'application/json' } }, opts));
   if (r.status === 401){ showLogin(); throw new Error('未登录'); }
@@ -757,8 +763,10 @@ function showApp(){
 $('#doLogin').onclick = async () => {
   $('#loginMsg').textContent = '';
   try {
-    await api('/api/login', { method:'POST', body: JSON.stringify({ password: $('#pwd').value }) });
+    const d = await api('/api/login', { method:'POST', body: JSON.stringify({ password: $('#pwd').value }) });
     showApp();
+    // 明确告诉用户这次给了多久，避免"到底有没有生效"要靠猜
+    if (d && d.ttl) toast('已登录：' + dur(d.ttl) + '内免登录' + (d.lan ? '（内网）' : '（非内网，仅 12 小时）'));
   } catch(e){ $('#loginMsg').textContent = e.message; }
 };
 $('#pwd').addEventListener('keydown', e => { if (e.key === 'Enter') $('#doLogin').click(); });
@@ -830,10 +838,16 @@ async function loadOverview(){
   if (p.gscore_console) $('#gscoreUrlText').textContent = p.gscore_console;
 
   const allOn = list.length && list.every(s => s.state === 'active');
+  const se = p.session || {};
+  const sessTxt = se.expire
+    ? (se.lan ? '<span class="tag on">内网</span>' : '<span class="tag warn">非内网</span>') +
+      ' 来源 ' + (se.ip || '—') + '，' + dur(Math.max(0, se.expire - Date.now() / 1000)) + '后过期'
+    : '—';
   $('#sysInfo').innerHTML =
     '版本　：' + ver + '<br>' +
     '目录　：' + (d.base_dir || '—') + '<br>' +
     '本机 IP：' + (p.lan_ip || '—') + '<br>' +
+    '本次会话：' + sessTxt + '<br>' +
     '服务　：' + (allOn ? '<span class="tag on">全部运行中</span>'
                         : '<span class="tag off">有服务未运行</span>');
 
