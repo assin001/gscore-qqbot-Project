@@ -772,6 +772,9 @@ class Handler(BaseHTTPRequestHandler):
                     "lan": is_lan_ip(self._client_ip()),
                     "expire": session_expire(self._auth()),
                 },
+                # 注意：顶层的 version 是 botctl.sh 的版本，别和面板版本混了
+                "version": VERSION,
+                "botctl_version": data.get("version", ""),
             }
             return self._json(data)
 

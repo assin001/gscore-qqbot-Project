@@ -808,9 +808,12 @@ async function loadOverview(){
   if (d.error){ toast('读取状态失败：' + d.error); return; }
   LAST = d;
 
-  const ver = 'v' + (d.version || '?');
+  // 顶层的 d.version 是 botctl.sh 的版本，面板自己的版本在 d.panel.version
+  const pv = 'v' + ((d.panel && d.panel.version) || '?');
+  const bv = 'v' + (d.version || '?');
   $('#brandSub').textContent = d.base_dir || '控制台';
-  $('#sideVer').textContent  = ver;
+  $('#sideVer').textContent  = pv;
+  $('#sideVer').title = 'Web 后台 panel.py ' + pv + ' / 管理脚本 botctl.sh ' + bv;
 
   const list = d.services || [];
   $('#svcBrief').innerHTML = list.map(svcHTML).join('') || '<div class="hint">没有服务信息</div>';
@@ -844,12 +847,13 @@ async function loadOverview(){
       ' 来源 ' + (se.ip || '—') + '，' + dur(Math.max(0, se.expire - Date.now() / 1000)) + '后过期'
     : '—';
   $('#sysInfo').innerHTML =
-    '版本　：' + ver + '<br>' +
-    '目录　：' + (d.base_dir || '—') + '<br>' +
-    '本机 IP：' + (p.lan_ip || '—') + '<br>' +
+    '后台版本：' + pv + '<br>' +
+    '脚本版本：' + bv + '（botctl.sh）<br>' +
+    '目录　　：' + (d.base_dir || '—') + '<br>' +
+    '本机 IP　：' + (p.lan_ip || '—') + '<br>' +
     '本次会话：' + sessTxt + '<br>' +
-    '服务　：' + (allOn ? '<span class="tag on">全部运行中</span>'
-                        : '<span class="tag off">有服务未运行</span>');
+    '服务　　：' + (allOn ? '<span class="tag on">全部运行中</span>'
+                          : '<span class="tag off">有服务未运行</span>');
 
   if (typeof bindRunButtons === 'function') bindRunButtons();
 }
